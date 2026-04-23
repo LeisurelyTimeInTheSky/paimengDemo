@@ -9,8 +9,10 @@
 Enemy::Enemy()
 {
 	loadimage(&img_shadow, _T("img/shadow_enemy.png"));
-	anim_left = new Animation(_T("img/enemy_left_%d.png"), 6, 45);
-	anim_right = new Animation(_T("img/enemy_right_%d.png"), 6, 45);
+	/*anim_left = new Animation(_T("img/enemy_left_%d.png"), 6, 45);
+	anim_right = new Animation(_T("img/enemy_right_%d.png"), 6, 45);*/
+	anim_left = new Animation(atlas_enemy_left, 45);
+	anim_right = new Animation(atlas_enemy_right, 45);
 
 	// 敌人生成边界
 	enum class SpawnEdge

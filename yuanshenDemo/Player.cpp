@@ -1,11 +1,14 @@
 #include "Player.h"
+#include "Atlas.h"
 
 
 Player::Player()
 {
 	loadimage(&img_shadow, _T("img/shadow_player.png"));
-	anim_left = new Animation(_T("img/player_left_%d.png"), 6, 45);
-	anim_right = new Animation(_T("img/player_right_%d.png"), 6, 45);
+	/*anim_left = new Animation(_T("img/player_left_%d.png"), 6, 45);
+	anim_right = new Animation(_T("img/player_right_%d.png"), 6, 45);*/
+	anim_left = new Animation(atlas_player_left, 45);
+	anim_right = new Animation(atlas_player_right, 45);
 
 	int pos_x = static_cast<int>(WINDOW_WIDTH / 2 - PLAYER_WIDTH / 2);
 	int pos_y = static_cast<int>(WINDOW_HEIGHT / 2 - PLAYER_HEIGHT / 2);

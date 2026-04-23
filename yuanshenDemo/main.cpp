@@ -331,9 +331,20 @@ int main()
 #include "Player.h"
 #include "Enemy.h"
 #include "Bullet.h"
+#include "Atlas.h"
+#include "StartGameButton.h"
+#include "QuitGameButton.h"
 
 int WINDOW_WIDTH = 1280;	// 屏幕宽度
 int WINDOW_HEIGHT = 720;	// 屏幕高度
+
+Atlas* atlas_player_left = nullptr;
+Atlas* atlas_player_right = nullptr;
+Atlas* atlas_enemy_left = nullptr;
+Atlas* atlas_enemy_right = nullptr;
+
+bool is_game_started = false;
+bool isRunning = true;
 
 // 生成新的敌人
 void TryGenerateEnemy(std::vector<Enemy*>& enemy_list)
@@ -375,22 +386,45 @@ int main()
 {
 	initgraph(WINDOW_WIDTH, WINDOW_HEIGHT);
 
+	atlas_player_left = new Atlas(_T("img/player_left_%d.png"), 6);
+	atlas_player_right = new Atlas(_T("img/player_right_%d.png"), 6);
+	atlas_enemy_left = new Atlas(_T("img/enemy_left_%d.png"), 6);
+	atlas_enemy_right = new Atlas(_T("img/enemy_right_%d.png"), 6);
+
 	mciSendString(_T("open mus/bgm.mp3 alias bgm"), NULL, 0, NULL);
 	mciSendString(_T("open mus/hit.wav alias hit"), NULL, 0, NULL);
-
-	mciSendString(_T("play bgm repeat from 0"), NULL, 0, NULL);
-
-	bool isRunning = true;
 
 	ExMessage msg;
 
 	IMAGE img_background;
-	loadimage(&img_background, _T("img/background.png"));
+	IMAGE img_menu;
 
 	Player player;
 	std::vector<Enemy*> enemy_list;
 	std::vector<Bullet> bullet_list(3);
 	int score = 0;	// 玩家得分
+
+
+	RECT region_btn_start_game, region_btn_quit_game;
+
+	region_btn_start_game.left = (WINDOW_WIDTH - BUTTON_WIDTH) / 2;
+	region_btn_start_game.right = region_btn_start_game.left + BUTTON_WIDTH;
+	region_btn_start_game.top = 430;
+	region_btn_start_game.bottom = region_btn_start_game.top + BUTTON_HEIGHT;
+
+	region_btn_quit_game.left = (WINDOW_WIDTH - BUTTON_WIDTH) / 2;
+	region_btn_quit_game.right = region_btn_quit_game.left + BUTTON_WIDTH;
+	region_btn_quit_game.top = 550;
+	region_btn_quit_game.bottom = region_btn_quit_game.top + BUTTON_HEIGHT;
+
+	StartGameButton btn_start_game = StartGameButton(region_btn_start_game,
+		_T("img/ui_start_idle.png"), _T("img/ui_start_hovered.png"), _T("img/ui_start_pushed.png"));
+	QuitGameButton btn_quit_game = QuitGameButton(region_btn_quit_game,
+		_T("img/ui_quit_idle.png"), _T("img/ui_quit_hovered.png"), _T("img/ui_quit_pushed.png"));
+
+	loadimage(&img_menu, _T("img/menu.png"));
+	loadimage(&img_background, _T("img/background.png"));
+
 
 	BeginBatchDraw();
 	while (isRunning)
@@ -402,65 +436,88 @@ int main()
 			if (msg.message == WM_KEYDOWN && msg.vkcode == VK_ESCAPE)
 				isRunning = false;
 
-			player.ProcessEvent(msg);
+			if(is_game_started)
+				player.ProcessEvent(msg);
+			else {
+				btn_start_game.ProcessEvent(msg);
+				btn_quit_game.ProcessEvent(msg);
+			}
 		}
 
 		// 数据处理
-		player.Move();
-		UpdateBullets(bullet_list, player);
-		TryGenerateEnemy(enemy_list);
-		for (Enemy* enemy : enemy_list)
-			enemy->Move(player);
-
-		// 检测敌人和玩家的碰撞
-		for (Enemy* enemy : enemy_list)
+		if (is_game_started)
 		{
-			if (enemy->CheckPlayerCollision(player))
-			{
-				static TCHAR text[128];
-				_stprintf_s(text, _T("最终得分：%d !"), score);
-				MessageBox(GetHWnd(), text, _T("游戏结束"), MB_OK);
-				isRunning = false;
-				break;
-			}
-		}
+			// 尝试生成新的敌人
+			TryGenerateEnemy(enemy_list);
 
-		// 检测子弹和敌人的碰撞
-		for (Enemy* enemy : enemy_list)
-		{
-			for (const Bullet& bullet : bullet_list)
+			// 移动玩家
+			player.Move();
+			// 更新子弹位置
+			UpdateBullets(bullet_list, player);
+			// 更新敌人位置
+			for (Enemy* enemy : enemy_list)
+				enemy->Move(player);
+
+			// 检测敌人和玩家的碰撞
+			for (Enemy* enemy : enemy_list)
 			{
-				if (enemy->CheckBulletCollision(bullet))
+				if (enemy->CheckPlayerCollision(player))
 				{
-					mciSendString(_T("play hit from 0"), NULL, 0, NULL);
-					enemy->Hurt();
-				}	
+					static TCHAR text[128];
+					_stprintf_s(text, _T("最终得分：%d !"), score);
+					MessageBox(GetHWnd(), text, _T("游戏结束"), MB_OK);
+					isRunning = false;
+					break;
+				}
 			}
-		}
 
-		// 移除生命值归零的敌人
-		for (size_t i = 0; i < enemy_list.size(); i++)
-		{
-			Enemy* enemy = enemy_list[i];
-			if (!enemy->CheckAlive())
+			// 检测子弹和敌人的碰撞
+			for (Enemy* enemy : enemy_list)
 			{
-				std::swap(enemy_list[i], enemy_list.back());
-				enemy_list.pop_back();
-				delete enemy;
-				score++;
+				for (const Bullet& bullet : bullet_list)
+				{
+					if (enemy->CheckBulletCollision(bullet))
+					{
+						mciSendString(_T("play hit from 0"), NULL, 0, NULL);
+						enemy->Hurt();
+					}
+				}
+			}
+
+			// 移除生命值归零的敌人
+			for (size_t i = 0; i < enemy_list.size(); i++)
+			{
+				Enemy* enemy = enemy_list[i];
+				if (!enemy->CheckAlive())
+				{
+					std::swap(enemy_list[i], enemy_list.back());
+					enemy_list.pop_back();
+					delete enemy;
+					score++;
+				}
 			}
 		}
 
+	
 		cleardevice();
 
 		// 渲染
-		putimage(0, 0, &img_background);	// 渲染背景	
-		player.Draw(1000 / 60);
-		for (Enemy* enemy : enemy_list)
-			enemy->Draw(1000 / 60);
-		for (const Bullet& bullet : bullet_list)
-			bullet.Draw();
-		DrawPlayerScore(score);	// 绘制玩家得分
+		if (is_game_started)
+		{
+			putimage(0, 0, &img_background);	// 渲染背景	
+			player.Draw(1000 / 60);
+			for (Enemy* enemy : enemy_list)
+				enemy->Draw(1000 / 60);
+			for (const Bullet& bullet : bullet_list)
+				bullet.Draw();
+			DrawPlayerScore(score);	// 绘制玩家得分
+		}
+		else
+		{
+			putimage(0, 0, &img_menu);
+			btn_start_game.Draw();
+			btn_quit_game.Draw();
+		}
 
 		FlushBatchDraw();
 
@@ -472,6 +529,12 @@ int main()
 			Sleep(1000 / 60 - delta_time);
 		}
 	}
+	// 移除玩家/敌人动画资源
+	delete atlas_player_left;
+	delete atlas_player_right;
+	delete atlas_enemy_left;
+	delete atlas_enemy_right;
+
 	EndBatchDraw();
 
 	closegraph();
